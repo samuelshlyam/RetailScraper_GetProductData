@@ -1,5 +1,5 @@
+import json
 import re
-
 from bs4 import BeautifulSoup
 
 
@@ -259,38 +259,183 @@ class ModesensParser():
                 product_details.append(product_detail)
 
         return product_details
-class DataFetcher:
-    @staticmethod
-    def parse_google_results(html_content):
+
+class BrandParsers:
+    def __init__(self,html_content,settings,brand_id):
+        brand_settings=settings.get(f"{brand_id}")
+        self.product_details=self.get_product_details(html_content,brand_settings)
+    def get_product_details(self,html_content,brand_settings):
+        product_details={}
+        original_price=""
+        sale_price=""
         soup = BeautifulSoup(html_content, 'html.parser')
-        results = []
-        for g in soup.find_all('div', class_='g'):
-            links = g.find_all('a')
-            if links and 'href' in links[0].attrs:  # check if 'href' attribute exists
-                results.append(links[0]['href'])
-        return results
-    def extract_product_schema(self, html_content):
-        product_schemas = []  # List to store all found product schemas
+        outer_type=brand_settings.get("Outer Type","")
+        outer_class=brand_settings.get("Outer Class","")
+        outer_details_block=soup.find(outer_type,class_=outer_class)
+        # Get original price
+        original_price_type=brand_settings.get("Original Price Type","")
+        original_price_class = brand_settings.get("Original Price Class","")
+        original_price_block=outer_details_block.find(original_price_type, class_=original_price_class)
+        if original_price_block:
+            original_price=original_price_block.text.strip()
+            product_details["Original Price"]=original_price
 
-        try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            schema_tags = soup.find_all('script', {'type': 'application/ld+json'})
+        # Get sale price
+        sale_price_type = brand_settings.get("Sales Price Type","")
+        sale_price_class = brand_settings.get("Sales Price Class","")
+        sale_price_block=outer_details_block.find(sale_price_type, class_=sale_price_class)
+        if sale_price_block:
+            sale_price = sale_price_block.text.strip()
+            product_details["Sale Price"] = sale_price
 
-            for tag in schema_tags:
-                try:
-                    data = json.loads(tag.text)
-                    if data.get('@type') == 'Product':
-                        # Log the raw product schema for debugging
-                        logging.debug("Raw Product Schema: %s", json.dumps(data, indent=4))
-                        product_schemas.append(data)
-                except json.JSONDecodeError:
-                    continue
+        # Fix prices
+        if not original_price and sale_price:
+            original_price=sale_price
+            product_details["Original Price"] = original_price
+        if not sale_price and original_price:
+            sale_price = original_price
+            product_details["Sale Price"] = sale_price
 
-            if not product_schemas:
-                logging.warning("No Product schema found in the HTML content.")
-                return None
+        # Get currency
+        if "$" in sale_price or "$" in original_price:
+            product_details["Currency"] = "USD"
+        if "€" in sale_price or "€" in original_price:
+            product_details["Currency"] = "Euro"
+        currency_type = brand_settings.get("Currency Type", "")
+        currency_class = brand_settings.get("Currency Class", "")
+        currency_block = outer_details_block.find(currency_type, class_=currency_class)
+        if currency_block:
+            currency = currency_block.text.strip()
+            product_details["Currency"] = currency
 
-            return product_schemas
-        except Exception as e:
-            logging.error(f"Error extracting product schemas from HTML: {e}")
+        # Get name
+        name_type = brand_settings.get("Name Type","")
+        name_class = brand_settings.get("Name Class","")
+        name_block=outer_details_block.find(name_type, class_=name_class)
+        if name_block:
+            name = name_block.text.strip()
+            product_details["Name"] = name
+
+        # Get source
+        source_type = brand_settings.get("Source Type","")
+        source_class = brand_settings.get("Source Class","")
+        source_block=outer_details_block.find(source_type, class_=source_class)
+        if source_block:
+            source = source_block.text.strip()
+            product_details["Source"] = source
+
+        # Get color
+        color_type = brand_settings.get("Color Type","")
+        color_class = brand_settings.get("Color Class","")
+        color_block=outer_details_block.find(color_type, class_=color_class)
+        if color_block:
+            color = color_block.text.strip()
+            product_details["Color"] = color
+
+        # Get composition
+        composition_type = brand_settings.get("Composition Type","")
+        composition_class = brand_settings.get("Composition Class","")
+        composition_block=outer_details_block.find(composition_type, class_=composition_class)
+        if composition_block:
+            composition = composition_block.text.strip()
+            product_details["Composition"] = composition
+
+        # Get description
+        description_type = brand_settings.get("Description Type","")
+        description_class = brand_settings.get("Description Class","")
+        description_block=outer_details_block.find(description_type, class_=description_class)
+        if description_block:
+            description = description_block.text.strip()
+            product_details["Description"] = description
+
+        #Get images
+        images_type = brand_settings.get("Images Type", "")
+        images_class = brand_settings.get("Images Class", "")
+        images_method = brand_settings.get("Images Method", "")
+        images_key = brand_settings.get("Images Key", "")
+        print(images_method)
+        images_blocks = outer_details_block.find_all(images_type, class_=images_class)
+        print(images_blocks)
+        for images_block in images_blocks:
+            if images_block:
+                product_details["Images"]=[]
+                if images_method=="Dictionary":
+                    images=images_block[images_key]
+                    print(images)
+                    product_details["Images"].append(images)
+                else:
+                    images = images_block.text.strip()
+                    product_details["Images"].append(images)
+
+        # Get product id
+        pid_type = brand_settings.get("Product ID Type","")
+        pid_class = brand_settings.get("Product ID Class","")
+        pid_method = brand_settings.get("Product ID Method", "")
+        pid_number=brand_settings.get("Product ID Number", "")
+        if pid_method=="List":
+            pid_blocks = outer_details_block.find_all(pid_type, class_=pid_class)
+            pid_block=pid_blocks[pid_number]
+            if pid_block:
+                pid = pid_block.text.strip()
+                product_details["Product ID"] = pid
+        else:
+            pid_block=outer_details_block.find(pid_type, class_=pid_class)
+            if pid_block:
+                pid = pid_block.text.strip()
+                product_details["Product ID"] = pid
+
+        return product_details
+
+def extract_product_schema(html_content):
+    product_schemas = []  # List to store all found product schemas
+
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        schema_tags = soup.find_all('script', {'type': 'application/ld+json'})
+
+        for tag in schema_tags:
+            try:
+                data = json.loads(tag.text)
+                if data.get('@type') == 'Product':
+                    # Log the raw product schema for debugging
+                    print("Raw Product Schema: %s", json.dumps(data, indent=4))
+                    product_schemas.append(data)
+            except json.JSONDecodeError:
+                continue
+
+        if not product_schemas:
+            print("No Product schema found in the HTML content.")
             return None
+
+        return product_schemas
+    except Exception as e:
+        print(f"Error extracting product schemas from HTML: {e}")
+        return None
+
+
+if __name__=="__main__":
+    input={'URL': 'https://modesens.com/product/givenchy-women-straw-medium-voyou-basket-shopping-bag-brown-107056049/?srsltid=AfmBOopaeFWB1EfjVueUNeuLWF9SBGWBGEYC4EF-Wcb8IehkINLozNHl', 'Variations': ['BB50V9B1UC-105'], 'Level': 'modesens', 'Currency': 'Wrong Currency'}
+    settings = json.loads(open("parsing_settings.json").read())
+    brand_id = "Fendi"
+    level=input["Level"]
+    source_url=input["URL"]
+    product_details="No product details found"
+    if level=="unapproved":
+        #unapproved_html_content=input["html_url"]
+        unapproved_html_content =open("unapproved_test.html").read()
+        product_schema=extract_product_schema(unapproved_html_content)
+        if product_schema:
+            SchemaParser=ProductSchema(product_schema,source_url)
+            product_details=SchemaParser.parsed_products
+        print(product_details)
+    elif level == "modesens":
+        # modesens_html_content=input["html_url"]
+        modesens_html_content = open("modesens_test.html").read()
+        product_details=ModesensParser(modesens_html_content).product_details
+        print(product_details)
+    elif level=="brand":
+        # brand_html_content=input["html_url"]
+        brand_html_content=open("brand_test.html").read()
+        product_details=BrandParsers(brand_html_content,settings,brand_id).product_details
+        print(product_details)
+    input["Product Details"]=product_details
