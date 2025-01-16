@@ -269,90 +269,90 @@ class BrandParsers:
         original_price=""
         sale_price=""
         soup = BeautifulSoup(html_content, 'html.parser')
-        outer_type=brand_settings.get("Outer Type","")
-        outer_class=brand_settings.get("Outer Class","")
+        outer_type=brand_settings.get("Outer_Type","")
+        outer_class=brand_settings.get("Outer_Class","")
         outer_details_block=soup.find(outer_type,class_=outer_class)
         # Get original price
-        original_price_type=brand_settings.get("Original Price Type","")
-        original_price_class = brand_settings.get("Original Price Class","")
+        original_price_type=brand_settings.get("Original_Price_Type","")
+        original_price_class = brand_settings.get("Original_Price_Class","")
         original_price_block=outer_details_block.find(original_price_type, class_=original_price_class)
         if original_price_block:
             original_price=original_price_block.text.strip()
-            product_details["Original Price"]=original_price
+            product_details["Original_Price"]=original_price
 
         # Get sale price
-        sale_price_type = brand_settings.get("Sales Price Type","")
-        sale_price_class = brand_settings.get("Sales Price Class","")
+        sale_price_type = brand_settings.get("Sales_Price_Type","")
+        sale_price_class = brand_settings.get("Sales_Price_Class","")
         sale_price_block=outer_details_block.find(sale_price_type, class_=sale_price_class)
         if sale_price_block:
             sale_price = sale_price_block.text.strip()
-            product_details["Sale Price"] = sale_price
+            product_details["Sale_Price"] = sale_price
 
         # Fix prices
         if not original_price and sale_price:
             original_price=sale_price
-            product_details["Original Price"] = original_price
+            product_details["Original_Price"] = original_price
         if not sale_price and original_price:
             sale_price = original_price
-            product_details["Sale Price"] = sale_price
+            product_details["Sale_Price"] = sale_price
 
         # Get currency
         if "$" in sale_price or "$" in original_price:
             product_details["Currency"] = "USD"
         if "€" in sale_price or "€" in original_price:
             product_details["Currency"] = "Euro"
-        currency_type = brand_settings.get("Currency Type", "")
-        currency_class = brand_settings.get("Currency Class", "")
+        currency_type = brand_settings.get("Currency_Type", "")
+        currency_class = brand_settings.get("Currency_Class", "")
         currency_block = outer_details_block.find(currency_type, class_=currency_class)
         if currency_block:
             currency = currency_block.text.strip()
             product_details["Currency"] = currency
 
         # Get name
-        name_type = brand_settings.get("Name Type","")
-        name_class = brand_settings.get("Name Class","")
+        name_type = brand_settings.get("Name_Type","")
+        name_class = brand_settings.get("Name_Class","")
         name_block=outer_details_block.find(name_type, class_=name_class)
         if name_block:
             name = name_block.text.strip()
             product_details["Name"] = name
 
         # Get source
-        source_type = brand_settings.get("Source Type","")
-        source_class = brand_settings.get("Source Class","")
+        source_type = brand_settings.get("Source_Type","")
+        source_class = brand_settings.get("Source_Class","")
         source_block=outer_details_block.find(source_type, class_=source_class)
         if source_block:
             source = source_block.text.strip()
             product_details["Source"] = source
 
         # Get color
-        color_type = brand_settings.get("Color Type","")
-        color_class = brand_settings.get("Color Class","")
+        color_type = brand_settings.get("Color_Type","")
+        color_class = brand_settings.get("Color_Class","")
         color_block=outer_details_block.find(color_type, class_=color_class)
         if color_block:
             color = color_block.text.strip()
             product_details["Color"] = color
 
         # Get composition
-        composition_type = brand_settings.get("Composition Type","")
-        composition_class = brand_settings.get("Composition Class","")
+        composition_type = brand_settings.get("Composition_Type","")
+        composition_class = brand_settings.get("Composition_Class","")
         composition_block=outer_details_block.find(composition_type, class_=composition_class)
         if composition_block:
             composition = composition_block.text.strip()
             product_details["Composition"] = composition
 
         # Get description
-        description_type = brand_settings.get("Description Type","")
-        description_class = brand_settings.get("Description Class","")
+        description_type = brand_settings.get("Description_Type","")
+        description_class = brand_settings.get("Description_Class","")
         description_block=outer_details_block.find(description_type, class_=description_class)
         if description_block:
             description = description_block.text.strip()
             product_details["Description"] = description
 
         #Get images
-        images_type = brand_settings.get("Images Type", "")
-        images_class = brand_settings.get("Images Class", "")
-        images_method = brand_settings.get("Images Method", "")
-        images_key = brand_settings.get("Images Key", "")
+        images_type = brand_settings.get("Images_Type", "")
+        images_class = brand_settings.get("Images_Class", "")
+        images_method = brand_settings.get("Images_Method", "")
+        images_key = brand_settings.get("Images_Key", "")
         print(images_method)
         images_blocks = outer_details_block.find_all(images_type, class_=images_class)
         print(images_blocks)
@@ -368,10 +368,10 @@ class BrandParsers:
                     product_details["Images"].append(images)
 
         # Get product id
-        pid_type = brand_settings.get("Product ID Type","")
-        pid_class = brand_settings.get("Product ID Class","")
-        pid_method = brand_settings.get("Product ID Method", "")
-        pid_number=brand_settings.get("Product ID Number", "")
+        pid_type = brand_settings.get("Product_ID_Type","")
+        pid_class = brand_settings.get("Product_ID_Class","")
+        pid_method = brand_settings.get("Product_ID_Method", "")
+        pid_number=brand_settings.get("Product_ID_Number", "")
         if pid_method=="List":
             pid_blocks = outer_details_block.find_all(pid_type, class_=pid_class)
             pid_block=pid_blocks[pid_number]
@@ -439,3 +439,4 @@ if __name__=="__main__":
         product_details=BrandParsers(brand_html_content,settings,brand_id).product_details
         print(product_details)
     input["Product Details"]=product_details
+    print(input)
