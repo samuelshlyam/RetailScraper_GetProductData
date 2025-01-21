@@ -225,7 +225,6 @@ class ModesensParser():
 
     def get_product_details(self):
         product_details = []
-
         for block in self.blocks:
             # Handle different types of price blocks
             product_detail = {}
@@ -260,7 +259,7 @@ class ModesensParser():
 
         return product_details
 
-class BrandParsers:
+class GeneralParser:
     def __init__(self,html_content,settings,brand_id):
         brand_settings=settings.get(f"{brand_id}")
         self.product_details=self.get_product_details(html_content,brand_settings)
@@ -272,21 +271,59 @@ class BrandParsers:
         outer_type=brand_settings.get("Outer_Type","")
         outer_class=brand_settings.get("Outer_Class","")
         outer_details_block=soup.find(outer_type,class_=outer_class)
-        # Get original price
-        original_price_type=brand_settings.get("Original_Price_Type","")
-        original_price_class = brand_settings.get("Original_Price_Class","")
-        original_price_block=outer_details_block.find(original_price_type, class_=original_price_class)
-        if original_price_block:
-            original_price=original_price_block.text.strip()
-            product_details["Original_Price"]=original_price
+        #Get prices
+        price_method = brand_settings.get("Price_Method", "")
+        if price_method=="Require_Outer":
+            # Get original price
+            original_price_type = brand_settings.get("Original_Price_Type", "")
+            original_price_class = brand_settings.get("Original_Price_Class", "")
+            original_price_type_2 = brand_settings.get("Original_Price_Type_2", "")
+            original_price_class_2 = brand_settings.get("Original_Price_Class_2", "")
+            outer_price_type = brand_settings.get("Price_Outer_Type", "")
+            outer_price_class = brand_settings.get("Price_Outer_Class", "")
+            outer_price_block = outer_details_block.find(outer_price_type,class_=outer_price_class)
+            original_price_block = outer_price_block.find(original_price_type, class_=original_price_class)
+            if original_price_block:
+                original_price = original_price_block.text.strip()
+                product_details["Original_Price"] = original_price
+            if original_price_class_2 and original_price_type_2:
+                original_price_block = outer_price_block.find(original_price_type_2, class_=original_price_class_2)
+                if original_price_block:
+                    original_price = original_price_block.text.strip()
+                    product_details["Original_Price"] = original_price
+            # Get sale price
+            sale_price_type = brand_settings.get("Sales_Price_Type", "")
+            sale_price_class = brand_settings.get("Sales_Price_Class", "")
+            sale_price_block = outer_price_block.find(sale_price_type, class_=sale_price_class)
+            if sale_price_block:
+                sale_price = sale_price_block.text.strip()
+                product_details["Sale_Price"] = sale_price
 
-        # Get sale price
-        sale_price_type = brand_settings.get("Sales_Price_Type","")
-        sale_price_class = brand_settings.get("Sales_Price_Class","")
-        sale_price_block=outer_details_block.find(sale_price_type, class_=sale_price_class)
-        if sale_price_block:
-            sale_price = sale_price_block.text.strip()
-            product_details["Sale_Price"] = sale_price
+        else:
+            # Get original price
+            original_price_type=brand_settings.get("Original_Price_Type","")
+            original_price_class = brand_settings.get("Original_Price_Class","")
+            original_price_type_2=brand_settings.get("Original_Price_Type_2","")
+            original_price_class_2=brand_settings.get("Original_Price_Class_2","")
+
+            original_price_block=outer_details_block.find(original_price_type, class_=original_price_class)
+            if original_price_block:
+                original_price=original_price_block.text.strip()
+                product_details["Original_Price"]=original_price
+            if original_price_class_2 and original_price_type_2:
+                original_price_block = outer_details_block.find(original_price_type_2, class_=original_price_class_2)
+                if original_price_block:
+                    original_price = original_price_block.text.strip()
+                    product_details["Original_Price"] = original_price
+
+            # Get sale price
+            sale_price_type = brand_settings.get("Sales_Price_Type","")
+            sale_price_class = brand_settings.get("Sales_Price_Class","")
+            sale_price_block=outer_details_block.find(sale_price_type, class_=sale_price_class)
+            if sale_price_block:
+                sale_price = sale_price_block.text.strip()
+                product_details["Sale_Price"] = sale_price
+
 
         # Fix prices
         if not original_price and sale_price:
@@ -295,6 +332,12 @@ class BrandParsers:
         if not sale_price and original_price:
             sale_price = original_price
             product_details["Sale_Price"] = sale_price
+        if price_method=="Switch_Prices":
+            original_price_num=float(original_price.replace("$",""))
+            sale_price_num=float(sale_price.replace("$",""))
+            if original_price_num<sale_price_num:
+                product_details["Original_Price"] = sale_price
+                product_details["Sale_Price"] = original_price
 
         # Get currency
         if "$" in sale_price or "$" in original_price:
@@ -368,22 +411,63 @@ class BrandParsers:
                     product_details["Images"].append(images)
 
         # Get product id
-        pid_type = brand_settings.get("Product_ID_Type","")
-        pid_class = brand_settings.get("Product_ID_Class","")
-        pid_method = brand_settings.get("Product_ID_Method", "")
-        pid_number=brand_settings.get("Product_ID_Number", "")
-        if pid_method=="List":
-            pid_blocks = outer_details_block.find_all(pid_type, class_=pid_class)
-            pid_block=pid_blocks[pid_number]
-            if pid_block:
-                pid = pid_block.text.strip()
-                product_details["Product ID"] = pid
-        else:
-            pid_block=outer_details_block.find(pid_type, class_=pid_class)
-            if pid_block:
-                pid = pid_block.text.strip()
-                product_details["Product ID"] = pid
-
+        pid_1_type = brand_settings.get("Product_ID_1_Type", "")
+        pid_1_class = brand_settings.get("Product_ID_1_Class", "")
+        pid_1_method = brand_settings.get("Product_ID_1_Method", "")
+        pid_1_text = brand_settings.get("Product_ID_1_Text", "")
+        pid_2_type = brand_settings.get("Product_ID_2_Type", "")
+        pid_2_class = brand_settings.get("Product_ID_2_Class", "")
+        pid_2_method = brand_settings.get("Product_ID_2_Method", "")
+        pid_2_text = brand_settings.get("Product_ID_2_Text", "")
+        pid_3_type = brand_settings.get("Product_ID_3_Type", "")
+        pid_3_class = brand_settings.get("Product_ID_3_Class", "")
+        pid_3_method = brand_settings.get("Product_ID_3_Method", "")
+        pid_3_text = brand_settings.get("Product_ID_3_Text", "")
+        pid_4_type = brand_settings.get("Product_ID_4_Type", "")
+        pid_4_class = brand_settings.get("Product_ID_4_Class", "")
+        pid_4_method = brand_settings.get("Product_ID_4_Method", "")
+        pid_4_text = brand_settings.get("Product_ID_4_Text", "")
+        pid_list = [{"pid_type": pid_1_type,
+                     "pid_class": pid_1_class,
+                     "pid_method": pid_1_method,
+                     "pid_text": pid_1_text},
+                    {"pid_type": pid_2_type,
+                     "pid_class": pid_2_class,
+                     "pid_method": pid_2_method,
+                     "pid_text": pid_2_text},
+                    {"pid_type": pid_3_type,
+                     "pid_class": pid_3_class,
+                     "pid_method": pid_3_method,
+                     "pid_text": pid_3_text},
+                    {"pid_type": pid_4_type,
+                     "pid_class": pid_4_class,
+                     "pid_method": pid_4_method,
+                     "pid_text": pid_4_text}
+                    ]
+        for index, pid_dict in enumerate(pid_list):
+            pid_type = pid_dict["pid_type"]
+            pid_class = pid_dict["pid_class"]
+            pid_method = pid_dict["pid_method"]
+            pid_text = pid_dict["pid_text"]
+            if pid_method == "List":
+                pid_blocks = outer_details_block.find_all(pid_type, class_=pid_class)
+                for pid_block in pid_blocks:
+                    if pid_block:
+                        if pid_text in pid_block.text.strip():
+                            pid = pid_block.text.strip().replace(pid_text,"")
+                            product_details[f"Product_ID_{index+1}"] = pid
+            else:
+                pid_block = outer_details_block.find(pid_type, class_=pid_class)
+                if pid_block:
+                    pid = pid_block.text.strip()
+                    product_details[f"Product_ID_{index+1}"] = pid
+        #Get brand name (mainly whitelist)
+        brand_name_class = brand_settings.get("Brand_Name_Class", "")
+        brand_name_type = brand_settings.get("Brand_Name_Type", "")
+        brand_name_block = outer_details_block.find(brand_name_type, class_=brand_name_class)
+        if brand_name_block:
+            brand_name = brand_name_block.text.strip()
+            product_details["Brand_Name"] = brand_name
         return product_details
 
 def extract_product_schema(html_content):
@@ -414,29 +498,34 @@ def extract_product_schema(html_content):
 
 
 if __name__=="__main__":
-    input={'URL': 'https://modesens.com/product/givenchy-women-straw-medium-voyou-basket-shopping-bag-brown-107056049/?srsltid=AfmBOopaeFWB1EfjVueUNeuLWF9SBGWBGEYC4EF-Wcb8IehkINLozNHl', 'Variations': ['BB50V9B1UC-105'], 'Level': 'modesens', 'Currency': 'Wrong Currency'}
+    input={'URL': 'https://www.saksfifthavenue.com/product/ralph-lauren-purple-label-striped-cotton-button-up-shirt-0400021783286.html?dwvar_0400021783286_color=GREY%20WHITE', 'Variations': ['BB60KSB24E341'], 'Level': 'whitelist', 'Currency': 'Wrong Currency','Whitelist_ID':'0000'}
     settings = json.loads(open("parsing_settings.json").read())
-    brand_id = "Fendi"
+    brand_id = "201"
     level=input["Level"]
     source_url=input["URL"]
     product_details="No product details found"
+    whitelist_id=input.get('Whitelist_ID')
     if level=="unapproved":
         #unapproved_html_content=input["html_url"]
-        unapproved_html_content =open("unapproved_test.html").read()
+        unapproved_html_content =open("output.html").read()
         product_schema=extract_product_schema(unapproved_html_content)
         if product_schema:
             SchemaParser=ProductSchema(product_schema,source_url)
             product_details=SchemaParser.parsed_products
         print(product_details)
+    elif level=="whitelist":
+        whitelist_html_content=open("output.html").read()
+        product_details=GeneralParser(whitelist_html_content,settings,whitelist_id).product_details
+        print(product_details)
     elif level == "modesens":
         # modesens_html_content=input["html_url"]
-        modesens_html_content = open("modesens_test.html").read()
+        modesens_html_content = open("output.html").read()
         product_details=ModesensParser(modesens_html_content).product_details
         print(product_details)
     elif level=="brand":
         # brand_html_content=input["html_url"]
-        brand_html_content=open("brand_test.html").read()
-        product_details=BrandParsers(brand_html_content,settings,brand_id).product_details
+        brand_html_content=open("output.html").read()
+        product_details=GeneralParser(brand_html_content,settings,brand_id).product_details
         print(product_details)
-    input["Product Details"]=product_details
+    input["Product_Details"]=product_details
     print(input)
